@@ -119,7 +119,7 @@ const pricingPlans = [
 ];
 
 export default function LandingPage() {
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, theme, setTheme } = useTheme();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -166,7 +166,7 @@ export default function LandingPage() {
             </div>
             <div className="hidden md:flex items-center gap-3 ml-auto">
               <button
-                onClick={toggleDarkMode}
+                onClick={() => setTheme(darkMode ? "light" : "dark")}
                 className={`p-2 rounded-lg transition-colors ${darkMode ? "text-gray-400 hover:text-white hover:bg-gray-800" : "text-gray-500 hover:bg-gray-100"}`}
                 aria-label="Toggle dark mode"
               >

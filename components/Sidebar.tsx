@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FolderCode,
@@ -12,15 +12,32 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  Monitor,
   LogOut,
   CreditCard,
   Activity,
   X,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { MoonLoader } from "react-spinners";
+import { signOut } from "next-auth/react";
+import { Button } from "./ui/button";
+import { useUser } from "@/hooks/useUser";
+
+type Theme = "light" | "dark" | "system";
 
 interface SidebarProps {
   darkMode: boolean;
-  toggleDarkMode: () => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
   collapsed?: boolean;
@@ -36,26 +53,31 @@ const navItems = [
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
+const themeOrder: Theme[] = ["system", "light", "dark"];
+
 export function Sidebar({
   darkMode,
-  toggleDarkMode,
+  theme,
+  setTheme,
   mobileOpen = false,
   onMobileClose,
   collapsed: controlledCollapsed,
   onCollapsedChange,
 }: SidebarProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, isLoading } = useUser();
   const collapsed = controlledCollapsed ?? internalCollapsed;
   const setCollapsed = (value: boolean) => {
     setInternalCollapsed(value);
     onCollapsedChange?.(value);
   };
-  const router = useRouter();
   const pathname = usePathname();
 
   const handleLogout = () => {
-    // TODO: Implement real logout logic
-    router.push("/login");
+    setIsLoggingOut(true);
+    signOut({ callbackUrl: "/dashboard" });
   };
 
   return (
@@ -86,6 +108,38 @@ export function Sidebar({
         <div
           className={`flex items-center h-16 px-4 border-b ${darkMode ? "border-gray-800" : "border-gray-100"}`}
         >
+          {/* Logout confirmation dialog */}
+          <Dialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm Logout</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to logout?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button
+                    variant="ghost"
+                    className="px-4 py-2 rounded-lg border"
+                  >
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  onClick={handleLogout}
+                  className="px-4 min-w-20 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <MoonLoader size={16} color="white" />
+                  ) : (
+                    "Logout"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
               <span
@@ -157,7 +211,11 @@ export function Sidebar({
         >
           {/* Dark mode toggle */}
           <button
-            onClick={toggleDarkMode}
+            onClick={() => {
+              const next =
+                themeOrder[(themeOrder.indexOf(theme) + 1) % themeOrder.length];
+              setTheme(next);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
               ${
                 darkMode
@@ -166,19 +224,29 @@ export function Sidebar({
               }
               ${collapsed ? "justify-center" : ""}
             `}
-            aria-label="Toggle dark mode"
+            aria-label="Toggle theme"
           >
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === "system" ? (
+              <Monitor size={18} />
+            ) : darkMode ? (
+              <Sun size={18} />
+            ) : (
+              <Moon size={18} />
+            )}
             {!collapsed && (
               <span className="text-sm font-medium">
-                {darkMode ? "Light Mode" : "Dark Mode"}
+                {theme === "system"
+                  ? "System"
+                  : darkMode
+                    ? "Light Mode"
+                    : "Dark Mode"}
               </span>
             )}
           </button>
 
           {/* Logout */}
           <button
-            onClick={handleLogout}
+            onClick={() => setIsLogoutOpen(true)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
               ${
                 darkMode
@@ -199,13 +267,17 @@ export function Sidebar({
               className={`flex items-center gap-3 px-3 py-2 rounded-lg mt-1 ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-xs font-semibold">JD</span>
+                <span className="text-white text-xs font-semibold">
+                  {user?.name?.charAt(0) || "U"}
+                </span>
               </div>
               <div className="min-w-0 flex-1">
                 <p
                   className={`text-sm font-semibold truncate ${darkMode ? "text-white" : "text-gray-900"}`}
                 >
-                  John Doe
+                  {isLoading
+                    ? "Loading..."
+                    : user?.name || user?.email || "User"}
                 </p>
                 <p
                   className={`text-xs truncate ${darkMode ? "text-gray-500" : "text-gray-500"}`}
