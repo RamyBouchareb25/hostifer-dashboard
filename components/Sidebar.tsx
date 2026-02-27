@@ -141,7 +141,7 @@ export function Sidebar({
             </DialogContent>
           </Dialog>
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center shrink-0">
               <span
                 className="text-white font-bold text-sm"
                 style={{ fontFamily: "Inter, sans-serif" }}
@@ -189,7 +189,7 @@ export function Sidebar({
                     `}
                     title={collapsed ? item.label : undefined}
                   >
-                    <item.icon size={18} className="flex-shrink-0" />
+                    <item.icon size={18} className="shrink-0" />
                     {!collapsed && (
                       <span
                         className="text-sm font-medium"
@@ -266,7 +266,7 @@ export function Sidebar({
             <div
               className={`flex items-center gap-3 px-3 py-2 rounded-lg mt-1 ${darkMode ? "bg-gray-800" : "bg-gray-50"}`}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center shrink-0">
                 <span className="text-white text-xs font-semibold">
                   {user?.name?.charAt(0) || "U"}
                 </span>

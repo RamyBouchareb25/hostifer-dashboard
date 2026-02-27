@@ -105,7 +105,7 @@ export default function SignupForm() {
       />
 
       {/* Left panel — decoration */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-[#0A4D9E] via-[#7C3AED] to-[#22C55E]/70 relative overflow-hidden">
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-linear-to-br from-[#0A4D9E] via-[#7C3AED] to-[#22C55E]/70 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-20 right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
           <div className="absolute bottom-20 left-20 w-80 h-80 bg-[#22C55E]/20 rounded-full blur-3xl" />
@@ -124,7 +124,7 @@ export default function SignupForm() {
               "GitHub & GitLab integration",
             ].map((item) => (
               <div key={item} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-[#22C55E] flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#22C55E] flex items-center justify-center shrink-0">
                   <Check size={12} className="text-white" />
                 </div>
                 <span className="text-blue-100">{item}</span>
@@ -139,7 +139,7 @@ export default function SignupForm() {
         className={`flex flex-col justify-center w-full max-w-md mx-auto lg:mx-0 px-8 py-12 ${darkMode ? "bg-[#111827]" : "bg-white"} lg:shadow-xl`}
       >
         <div className="flex items-center gap-2 mb-10">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center">
             <span className="text-white font-bold text-sm">H</span>
           </div>
           <span
