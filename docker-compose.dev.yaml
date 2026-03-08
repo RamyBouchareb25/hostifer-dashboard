@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hostifer
+      POSTGRES_PASSWORD: hostifer
+      POSTGRES_DB: hostifer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hostifer -d hostifer"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    image: oven/bun:1
+    working_dir: /app
+    command: sh -c "bun install && bunx prisma migrate deploy && bun dev"
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://hostifer:hostifer@db:5432/hostifer?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  studio:
+    image: oven/bun:1
+    working_dir: /app
+    command: sh -c "bun install && bunx prisma studio --port 5555 --browser none"
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://hostifer:hostifer@db:5432/hostifer?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  node_modules:
