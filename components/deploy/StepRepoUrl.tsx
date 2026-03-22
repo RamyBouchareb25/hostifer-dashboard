@@ -12,8 +12,10 @@ import {
 import Image from "next/image";
 import { useTheme } from "@/context/ThemeContext";
 import { validateRepo } from "@/app/actions/validateRepo";
+import { createProject } from "@/lib/actions/projects";
 
 export interface RepoInfo {
+  projectId: string;
   repoUrl: string;
   branch: string;
   name: string;
@@ -61,6 +63,7 @@ export default function StepRepoUrl({ onNext }: StepRepoUrlProps) {
   const [framework, setFramework] = useState<string | null>(null);
   const [repoDescription, setRepoDescription] = useState<string | null>(null);
   const [repoStars, setRepoStars] = useState<number | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const textPrimary = darkMode ? "text-white" : "text-gray-900";
   const textSecondary = darkMode ? "text-gray-400" : "text-gray-500";
@@ -127,18 +130,35 @@ export default function StepRepoUrl({ onNext }: StepRepoUrlProps) {
     setValidating(false);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!validated) return;
     if (!name.trim()) {
       setError("Service name is required");
       return;
     }
-    onNext({
-      repoUrl: repoUrl.trim(),
-      branch,
-      name: name.trim(),
-      framework: framework ?? "not-detected",
-    });
+
+    setIsCreating(true);
+    try {
+      const { projectId } = await createProject({
+        name: name.trim(),
+        repoUrl: repoUrl.trim(),
+        framework: framework ?? "not-detected",
+        port: 3000, // Default port for now
+      });
+
+      onNext({
+        projectId,
+        repoUrl: repoUrl.trim(),
+        branch,
+        name: name.trim(),
+        framework: framework ?? "not-detected",
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("Unknown error");
+      setError(error.message || "Failed to create project");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -357,9 +377,10 @@ export default function StepRepoUrl({ onNext }: StepRepoUrlProps) {
         <button
           type="button"
           onClick={handleNext}
-          disabled={!validated || !name.trim()}
+          disabled={!validated || !name.trim() || isCreating}
           className="flex items-center gap-2 bg-[#0A4D9E] hover:bg-[#0a3d7e] disabled:opacity-50 text-white px-6 py-3 rounded-lg font-medium text-sm transition-all"
         >
+          {isCreating ? <Loader2 size={16} className="animate-spin" /> : null}
           Continue
           <ArrowRight size={16} />
         </button>

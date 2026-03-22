@@ -1,289 +1,277 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, Terminal } from "lucide-react";
-import { mockDeploymentLogs } from "@/data/mockData";
+import { Loader2, Terminal, CheckCircle2, XCircle, Circle } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
+import { syncDeploymentStatus } from "@/lib/actions/deployments";
+import type { LogLine } from "@/lib/loki-client";
 
 interface StepBuildProps {
   repoUrl: string;
   serviceName: string;
-  onComplete: (deployedUrl: string) => void;
+  deploymentId: string;
+  onComplete: (
+    deployedUrl: string,
+    buildDuration?: number | null,
+    region?: string,
+  ) => void;
 }
+
+type StepState = "pending" | "running" | "succeeded" | "failed";
+
+interface PipelineStep {
+  name: string;
+  label: string;
+  status: StepState;
+}
+
+const INITIAL_STEPS: PipelineStep[] = [
+  { name: "BUILD", label: "Build Image", status: "pending" },
+  { name: "PROVISION", label: "Provision", status: "pending" },
+  { name: "DNS", label: "Configure DNS", status: "pending" },
+];
+
+const LOG_COLORS: Record<string, string> = {
+  info: "text-gray-300",
+  warn: "text-yellow-400",
+  error: "text-red-400",
+  fatal: "text-red-500",
+};
+
+const StepIcon = ({ status }: { status: StepState }) => {
+  if (status === "running")
+    return <Loader2 size={14} className="animate-spin text-blue-400" />;
+  if (status === "succeeded")
+    return <CheckCircle2 size={14} className="text-green-400" />;
+  if (status === "failed")
+    return <XCircle size={14} className="text-red-400" />;
+  return <Circle size={14} className="text-gray-600" />;
+};
 
 export default function StepBuild({
   repoUrl,
   serviceName,
+  deploymentId,
   onComplete,
 }: StepBuildProps) {
   const { darkMode } = useTheme();
-  const [logs, setLogs] = useState<typeof mockDeploymentLogs>([]);
-  const [logIndex, setLogIndex] = useState(0);
-  const [done, setDone] = useState(false);
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [steps, setSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
+  const [overallStatus, setOverallStatus] = useState<string>("BUILDING");
+  const [error, setError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Generate dynamic logs based on repo info
-  const buildLogs = React.useMemo(() => {
-    return [
-      {
-        time: "00:00",
-        level: "info",
-        message: "Initializing deployment pipeline...",
-      },
-      {
-        time: "00:01",
-        level: "info",
-        message: `Cloning repository: ${repoUrl}`,
-      },
-      {
-        time: "00:03",
-        level: "info",
-        message: "Repository cloned successfully (3.2 MB)",
-      },
-      {
-        time: "00:04",
-        level: "info",
-        message: "Detecting framework... Node.js detected",
-      },
-      {
-        time: "00:05",
-        level: "info",
-        message: "Installing dependencies with npm install...",
-      },
-      {
-        time: "00:12",
-        level: "info",
-        message: "added 847 packages in 7.2s",
-      },
-      {
-        time: "00:13",
-        level: "info",
-        message:
-          "Dependencies installed successfully (847 packages, 0 vulnerabilities)",
-      },
-      {
-        time: "00:14",
-        level: "info",
-        message: "Running build command: npm run build",
-      },
-      {
-        time: "00:15",
-        level: "info",
-        message: "Creating an optimized production build...",
-      },
-      {
-        time: "00:22",
-        level: "warn",
-        message:
-          "Warning: Some dependencies are not tree-shakable, bundle size may be larger than expected",
-      },
-      {
-        time: "00:28",
-        level: "info",
-        message: "Compiled successfully in 14.2s",
-      },
-      {
-        time: "00:29",
-        level: "info",
-        message: "Build output: 2.4 MB (gzipped: 812 KB)",
-      },
-      {
-        time: "00:30",
-        level: "info",
-        message: "Build completed successfully",
-      },
-      {
-        time: "00:31",
-        level: "info",
-        message: `Creating Docker image for ${serviceName}...`,
-      },
-      {
-        time: "00:38",
-        level: "info",
-        message: "Docker image built: sha256:e8f2a1c9d4b7...",
-      },
-      {
-        time: "00:39",
-        level: "info",
-        message: "Pushing image to container registry...",
-      },
-      {
-        time: "00:45",
-        level: "info",
-        message: "Image pushed to registry successfully",
-      },
-      {
-        time: "00:46",
-        level: "info",
-        message: "Provisioning deployment resources...",
-      },
-      {
-        time: "00:50",
-        level: "info",
-        message: "Starting container on US-East-1...",
-      },
-      {
-        time: "00:53",
-        level: "info",
-        message: "Running health checks...",
-      },
-      {
-        time: "00:56",
-        level: "info",
-        message: "Health check passed (HTTP 200 in 42ms)",
-      },
-      {
-        time: "00:57",
-        level: "info",
-        message: "Configuring SSL certificate...",
-      },
-      {
-        time: "00:59",
-        level: "info",
-        message: "SSL certificate provisioned via Let's Encrypt",
-      },
-      {
-        time: "01:00",
-        level: "info",
-        message: "Routing traffic to new deployment...",
-      },
-      {
-        time: "01:02",
-        level: "success",
-        message: `Deployment successful! Live at ${serviceName}.hostifer.io`,
-      },
-    ];
-  }, [repoUrl, serviceName]);
-
-  // Stream logs with delay
-  useEffect(() => {
-    if (done) return;
-    if (logIndex >= buildLogs.length) {
-      // Delay the state update to avoid synchronous setState in effect
-      const doneTimer = setTimeout(() => {
-        setDone(true);
-      }, 0);
-      const completeTimer = setTimeout(() => {
-        onComplete(`${serviceName}.hostifer.io`);
-      }, 1200);
-      return () => {
-        clearTimeout(doneTimer);
-        clearTimeout(completeTimer);
-      };
-    }
-    const delay =
-      logIndex < 3
-        ? 400
-        : logIndex > buildLogs.length - 3
-          ? 500
-          : 350 + Math.random() * 300;
-    const timer = setTimeout(() => {
-      setLogs((prev) => [...prev, buildLogs[logIndex]]);
-      setLogIndex((i) => i + 1);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [logIndex, done, buildLogs, onComplete, serviceName]);
-
-  // Auto-scroll logs
+  // auto-scroll to bottom on new log lines
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [logs]);
 
-  const logColors: Record<string, string> = {
-    info: darkMode ? "text-gray-300" : "text-gray-300",
-    warn: "text-yellow-400",
-    error: "text-red-400",
-    success: "text-green-400",
-  };
+  // SSE log streaming
+  useEffect(() => {
+    const es = new EventSource(`/api/deployments/${deploymentId}/logs`);
+    eventSourceRef.current = es;
 
-  const progress = Math.round((logIndex / buildLogs.length) * 100);
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "done") {
+          es.close();
+          return;
+        }
+        if (data.type === "error") {
+          setError(data.message);
+          es.close();
+          return;
+        }
+        // deduplicate by timestamp+message to avoid showing the same line twice
+        // when the poller resets (e.g. on reconnect)
+        setLogs((prev) => {
+          const last = prev[prev.length - 1];
+          if (
+            last &&
+            last.timestamp === data.timestamp &&
+            last.message === data.message
+          ) {
+            return prev;
+          }
+          return [...prev, data as LogLine];
+        });
+      } catch {
+        // malformed event, skip
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource auto-reconnects on error — don't close it here
+      // unless we're in a terminal state (handled by status polling below)
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [deploymentId]);
+
+  // status polling — syncs DB state from Argo every 3 seconds
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const result = await syncDeploymentStatus(deploymentId);
+        setOverallStatus(result.status);
+
+        setSteps((prev) =>
+          prev.map((s) => {
+            const synced = result.steps.find((rs) => rs.name === s.name);
+            return synced
+              ? { ...s, status: synced.status.toLowerCase() as StepState }
+              : s;
+          }),
+        );
+
+        if (result.status === "LIVE") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          eventSourceRef.current?.close();
+          const url =
+            result.deployedUrl ??
+            `${serviceName}.${process.env.NEXT_PUBLIC_HOSTIFER_DOMAIN ?? "hostifer.me"}`;
+          setTimeout(
+            () => onComplete(url, result.buildDuration, result.region),
+            800,
+          );
+        }
+
+        if (result.status === "FAILED") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          eventSourceRef.current?.close();
+          setError(result.errorMessage ?? "Deployment failed");
+        }
+      } catch {
+        // transient error — keep polling
+      }
+    };
+
+    poll();
+    pollRef.current = setInterval(poll, 3000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [deploymentId, serviceName, onComplete]);
+
+  const isFailed = overallStatus === "FAILED";
+  const isLive = overallStatus === "LIVE";
+  const isDone = isFailed || isLive;
 
   return (
     <div className="space-y-4">
-      {/* Status header */}
+      {/* Pipeline step indicators */}
       <div
-        className={`flex items-center justify-between p-4 rounded-xl border ${
-          darkMode
-            ? "bg-blue-900/20 border-blue-800"
-            : "bg-blue-50 border-blue-200"
-        }`}
+        className={`flex items-center justify-between p-4 rounded-xl border gap-4
+          ${darkMode ? "bg-[#111827] border-gray-800" : "bg-white border-gray-100 shadow-sm"}`}
+      >
+        {steps.map((step, i) => (
+          <React.Fragment key={step.name}>
+            <div className="flex items-center gap-2">
+              <StepIcon status={step.status} />
+              <span
+                className={`text-sm font-medium
+                  ${
+                    step.status === "succeeded"
+                      ? "text-green-400"
+                      : step.status === "running"
+                        ? "text-blue-400"
+                        : step.status === "failed"
+                          ? "text-red-400"
+                          : darkMode
+                            ? "text-gray-500"
+                            : "text-gray-400"
+                  }`}
+              >
+                {step.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div
+                className={`flex-1 h-px ${
+                  steps[i + 1].status !== "pending"
+                    ? "bg-blue-500"
+                    : darkMode
+                      ? "bg-gray-800"
+                      : "bg-gray-200"
+                }`}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Overall status bar */}
+      <div
+        className={`flex items-center justify-between p-4 rounded-xl border
+          ${
+            isFailed
+              ? darkMode
+                ? "bg-red-900/20 border-red-800"
+                : "bg-red-50 border-red-200"
+              : isLive
+                ? darkMode
+                  ? "bg-green-900/20 border-green-800"
+                  : "bg-green-50 border-green-200"
+                : darkMode
+                  ? "bg-blue-900/20 border-blue-800"
+                  : "bg-blue-50 border-blue-200"
+          }`}
       >
         <div className="flex items-center gap-3">
-          <Loader2
-            size={18}
-            className={`animate-spin ${
-              darkMode ? "text-blue-400" : "text-blue-600"
-            } ${done ? "hidden" : ""}`}
-          />
-          {done && (
-            <div className="w-4.5 h-4.5 rounded-full bg-green-500 flex items-center justify-center">
-              <svg
-                className="w-3 h-3 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={3}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
+          {!isDone && (
+            <Loader2 size={18} className="animate-spin text-blue-400" />
           )}
-          <div>
-            <span
-              className={`text-sm font-medium ${
-                darkMode ? "text-blue-300" : "text-blue-700"
-              }`}
-            >
-              {done ? "Build complete!" : "Building your application..."}
-            </span>
-            <p
-              className={`text-xs mt-0.5 ${
-                darkMode ? "text-blue-400/70" : "text-blue-600/70"
-              }`}
-            >
-              {done
-                ? "Finalizing deployment..."
-                : `Step ${Math.min(logIndex + 1, buildLogs.length)} of ${buildLogs.length}`}
-            </p>
-          </div>
+          {isLive && <CheckCircle2 size={18} className="text-green-400" />}
+          {isFailed && <XCircle size={18} className="text-red-400" />}
+          <span
+            className={`text-sm font-medium
+              ${isFailed ? "text-red-400" : isLive ? "text-green-400" : "text-blue-400"}`}
+          >
+            {isFailed
+              ? "Deployment failed"
+              : isLive
+                ? "Deployment live!"
+                : "Deploying your application..."}
+          </span>
         </div>
         <span
-          className={`text-xs font-mono ${
-            darkMode ? "text-blue-400" : "text-blue-600"
-          }`}
+          className={`text-xs font-mono ${darkMode ? "text-gray-500" : "text-gray-400"}`}
         >
-          {progress}%
+          {logs.length} lines
         </span>
       </div>
 
-      {/* Progress bar */}
-      <div
-        className={`h-1.5 rounded-full overflow-hidden ${
-          darkMode ? "bg-gray-800" : "bg-gray-200"
-        }`}
-      >
+      {/* Error banner */}
+      {error && (
         <div
-          className="h-full bg-[#0A4D9E] rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+          className={`p-3 rounded-lg text-sm text-red-400
+            ${
+              darkMode
+                ? "bg-red-900/20 border border-red-800"
+                : "bg-red-50 border border-red-200"
+            }`}
+        >
+          {error}
+        </div>
+      )}
 
       {/* Log terminal */}
       <div
-        className={`rounded-xl overflow-hidden border ${
-          darkMode ? "border-gray-800" : "border-gray-200"
-        }`}
+        className={`rounded-xl overflow-hidden border
+          ${darkMode ? "border-gray-800" : "border-gray-200"}`}
       >
+        {/* Terminal title bar */}
         <div
-          className={`flex items-center justify-between px-4 py-3 ${
-            darkMode ? "bg-gray-900" : "bg-gray-800"
-          }`}
+          className={`flex items-center justify-between px-4 py-3
+            ${darkMode ? "bg-gray-900" : "bg-gray-800"}`}
         >
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
@@ -296,21 +284,23 @@ export default function StepBuild({
               style={{ fontFamily: "JetBrains Mono, monospace" }}
             >
               <Terminal size={12} className="inline mr-1.5" />
-              Build Log
+              Build Log — {serviceName}
             </span>
           </div>
-          {!done && (
+          {!isDone ? (
             <span className="flex items-center gap-1.5 text-xs text-blue-400">
-              <Loader2 size={12} className="animate-spin" />
-              Live
+              <Loader2 size={12} className="animate-spin" /> Live
             </span>
-          )}
-          {done && (
-            <span className="flex items-center gap-1.5 text-xs text-green-400">
-              Complete
+          ) : (
+            <span
+              className={`text-xs ${isLive ? "text-green-400" : "text-red-400"}`}
+            >
+              {isLive ? "Complete" : "Failed"}
             </span>
           )}
         </div>
+
+        {/* Log lines */}
         <div
           ref={logRef}
           className="bg-gray-950 p-4 h-80 overflow-y-auto space-y-1"
@@ -318,19 +308,34 @@ export default function StepBuild({
           aria-live="polite"
           aria-label="Build logs"
         >
+          {logs.length === 0 && (
+            <div className="text-gray-600 text-xs">Waiting for logs...</div>
+          )}
           {logs.map((log, i) => (
             <div key={i} className="flex items-start gap-3">
               <span className="text-gray-600 text-xs shrink-0 mt-px">
-                {log.time}
+                {new Date(log.timestamp).toISOString().slice(11, 19)}
               </span>
               <span
-                className={`text-xs ${logColors[log.level] || "text-gray-300"}`}
+                className={`text-xs px-1.5 py-0.5 rounded text-[10px] shrink-0
+                  ${
+                    log.level === "error" || log.level === "fatal"
+                      ? "bg-red-900/40 text-red-400"
+                      : log.level === "warn"
+                        ? "bg-yellow-900/40 text-yellow-400"
+                        : "bg-gray-800 text-gray-500"
+                  }`}
+              >
+                {log.stream ?? log.level}
+              </span>
+              <span
+                className={`text-xs break-all ${LOG_COLORS[log.level] ?? "text-gray-300"}`}
               >
                 {log.message}
               </span>
             </div>
           ))}
-          {!done && (
+          {!isDone && (
             <div className="flex items-center gap-2 text-gray-500 text-xs">
               <span className="animate-pulse">█</span>
             </div>

@@ -17,13 +17,27 @@ interface StepSuccessProps {
   serviceName: string;
   deployedUrl: string;
   repoUrl: string;
+  deploymentId?: string;
+  buildDuration?: number | null;
+  region?: string;
   onNewDeploy: () => void;
+}
+
+function formatDuration(seconds?: number | null) {
+  if (!seconds) return "--";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
 }
 
 export default function StepSuccess({
   serviceName,
   deployedUrl,
   repoUrl,
+  deploymentId,
+  buildDuration,
+  region,
   onNewDeploy,
 }: StepSuccessProps) {
   const { darkMode } = useTheme();
@@ -146,19 +160,23 @@ export default function StepSuccess({
             </div>
             <div>
               <p className={`text-xs ${textSecondary}`}>Deployment ID</p>
-              <p className={`text-sm font-mono ${textPrimary}`}>dep-a8f2e1c9</p>
+              <p className={`text-sm font-mono ${textPrimary}`}>
+                {deploymentId || "--"}
+              </p>
             </div>
           </div>
           <div className="space-y-3">
             <div>
               <p className={`text-xs ${textSecondary}`}>Region</p>
               <p className={`text-sm font-medium ${textPrimary}`}>
-                🇺🇸 US East (N. Virginia)
+                {region === "local" ? "💻 Local" : "🇺🇸 US East (N. Virginia)"}
               </p>
             </div>
             <div>
               <p className={`text-xs ${textSecondary}`}>Build Duration</p>
-              <p className={`text-sm font-medium ${textPrimary}`}>1m 02s</p>
+              <p className={`text-sm font-medium ${textPrimary}`}>
+                {formatDuration(buildDuration)}
+              </p>
             </div>
             <div>
               <p className={`text-xs ${textSecondary}`}>Status</p>

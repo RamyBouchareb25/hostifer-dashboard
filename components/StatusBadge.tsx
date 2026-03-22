@@ -1,7 +1,6 @@
 "use client";
+import { DeployStatus } from '../data/mockData';
 
-import React from "react";
-import type { DeployStatus } from "@/data/mockData";
 
 interface StatusBadgeProps {
   status: DeployStatus;

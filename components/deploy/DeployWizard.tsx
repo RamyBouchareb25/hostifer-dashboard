@@ -21,7 +21,13 @@ export default function DeployWizard() {
   const { darkMode } = useTheme();
   const [currentStep, setCurrentStep] = useState<Step>("repo");
   const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
-  const [deployedUrl, setDeployedUrl] = useState("");
+  const [projectId, setProjectId] = useState<string>("");
+  const [deploymentId, setDeploymentId] = useState<string>("");
+  const [deployResult, setDeployResult] = useState<{
+    url: string;
+    buildDuration?: number | null;
+    region?: string;
+  } | null>(null);
 
   const textPrimary = darkMode ? "text-white" : "text-gray-900";
   const textSecondary = darkMode ? "text-gray-400" : "text-gray-500";
@@ -30,21 +36,26 @@ export default function DeployWizard() {
 
   const handleRepoNext = (data: RepoInfo) => {
     setRepoInfo(data);
+    setProjectId(data.projectId);
     setCurrentStep("config");
   };
 
-  const handleConfigNext = () => {
+  const handleConfigNext = (newDeploymentId: string) => {
+    setDeploymentId(newDeploymentId);
     setCurrentStep("build");
   };
 
-  const handleBuildComplete = useCallback((url: string) => {
-    setDeployedUrl(url);
-    setCurrentStep("success");
-  }, []);
+  const handleBuildComplete = useCallback(
+    (url: string, buildDuration?: number | null, region?: string) => {
+      setDeployResult({ url, buildDuration, region });
+      setCurrentStep("success");
+    },
+    [],
+  );
 
   const handleNewDeploy = () => {
     setRepoInfo(null);
-    setDeployedUrl("");
+    setDeployResult(null);
     setCurrentStep("repo");
   };
 
@@ -115,26 +126,31 @@ export default function DeployWizard() {
       {/* Step content */}
       {currentStep === "repo" && <StepRepoUrl onNext={handleRepoNext} />}
 
-      {currentStep === "config" && (
+      {currentStep === "config" && projectId && (
         <StepConfigEnv
+          projectId={projectId}
           onNext={handleConfigNext}
           onBack={() => setCurrentStep("repo")}
         />
       )}
 
-      {currentStep === "build" && repoInfo && (
+      {currentStep === "build" && repoInfo && deploymentId && (
         <StepBuild
+          deploymentId={deploymentId}
           repoUrl={repoInfo.repoUrl}
           serviceName={repoInfo.name}
           onComplete={handleBuildComplete}
         />
       )}
 
-      {currentStep === "success" && repoInfo && (
+      {currentStep === "success" && repoInfo && deployResult && (
         <StepSuccess
           serviceName={repoInfo.name}
-          deployedUrl={deployedUrl}
+          deployedUrl={deployResult.url}
           repoUrl={repoInfo.repoUrl}
+          deploymentId={deploymentId}
+          buildDuration={deployResult.buildDuration}
+          region={deployResult.region}
           onNewDeploy={handleNewDeploy}
         />
       )}

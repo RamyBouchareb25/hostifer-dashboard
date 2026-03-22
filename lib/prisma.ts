@@ -2,8 +2,7 @@ import { PrismaClient } from "@/lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PrismaClientConstructor = PrismaClient as any;
+const PrismaClientConstructor = PrismaClient;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: InstanceType<typeof PrismaClientConstructor> | undefined;

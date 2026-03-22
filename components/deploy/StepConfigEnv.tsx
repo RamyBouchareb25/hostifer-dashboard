@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/context/ThemeContext";
+import { updateProjectSettings } from "@/lib/actions/projects";
+import { triggerDeployment } from "@/lib/actions/deployments";
+import { Loader2 } from "lucide-react";
 
 interface EnvVar {
   id: string;
@@ -21,21 +24,21 @@ interface EnvVar {
   hidden: boolean;
 }
 
-interface ConfigData {
-  region: string;
-  plan: string;
-  buildCommand: string;
-  startCommand: string;
-  envVars: EnvVar[];
-}
 
 interface StepConfigEnvProps {
-  onNext: (data: ConfigData) => void;
+  projectId: string;
+  onNext: (deploymentId: string) => void;
+
   onBack: () => void;
 }
 
-export default function StepConfigEnv({ onNext, onBack }: StepConfigEnvProps) {
+export default function StepConfigEnv({
+  projectId,
+  onNext,
+  onBack,
+}: StepConfigEnvProps) {
   const { darkMode } = useTheme();
+  const [isDeploying, setIsDeploying] = useState(false);
   const [region, setRegion] = useState("alg-central-1");
   const [plan, setPlan] = useState("starter");
   const [buildCommand, setBuildCommand] = useState("npm run build");
@@ -89,8 +92,31 @@ export default function StepConfigEnv({ onNext, onBack }: StepConfigEnvProps) {
     toast.success("Copied to clipboard!");
   };
 
-  const handleNext = () => {
-    onNext({ region, plan, buildCommand, startCommand, envVars });
+  const handleNext = async () => {
+    setIsDeploying(true);
+    try {
+      await updateProjectSettings(projectId, {
+        region,
+        planName: plan,
+        buildCommand,
+        startCommand,
+        envVars: envVars
+          .filter((v) => v.key)
+          .map((v) => ({
+            key: v.key,
+            value: v.value,
+            isSecret: v.hidden,
+          })),
+      });
+
+      const { deploymentId } = await triggerDeployment(projectId);
+      onNext(deploymentId);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("Unknown error");
+      toast.error(error.message || "Failed to trigger deployment.");
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   return (
@@ -316,8 +342,10 @@ export default function StepConfigEnv({ onNext, onBack }: StepConfigEnvProps) {
         <button
           type="button"
           onClick={handleNext}
-          className="flex items-center gap-2 bg-[#0A4D9E] hover:bg-[#0a3d7e] text-white px-6 py-3 rounded-lg font-medium text-sm transition-all"
+          disabled={isDeploying}
+          className="flex items-center gap-2 bg-[#0A4D9E] hover:bg-[#0a3d7e] disabled:opacity-50 text-white px-6 py-3 rounded-lg font-medium text-sm transition-all"
         >
+          {isDeploying ? <Loader2 size={16} className="animate-spin" /> : null}
           Deploy
           <ArrowRight size={16} />
         </button>
