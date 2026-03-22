@@ -134,7 +134,7 @@ export default function LandingPage() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 gap-8">
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center">
                 <span className="text-white font-bold text-sm">H</span>
               </div>
@@ -450,8 +450,8 @@ export default function LandingPage() {
                         size={16}
                         className={
                           plan.highlighted
-                            ? "text-blue-200 flex-shrink-0"
-                            : "text-[#22C55E] flex-shrink-0"
+                            ? "text-blue-200 shrink-0"
+                            : "text-[#22C55E] shrink-0"
                         }
                       />
                       <span

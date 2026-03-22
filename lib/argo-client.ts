@@ -7,7 +7,6 @@ export class ArgoError extends Error {
     this.name = "ArgoError";
   }
 }
-
 export const argoClient = {
   async submitDeployWorkflow(params: {
     tenantId: string;
@@ -98,6 +97,7 @@ export const argoClient = {
       finishedAt: data.status?.finishedAt ?? null,
       nodes: Object.fromEntries(
         Object.entries(data.status?.nodes ?? {}).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ([k, v]: [string, any]) => [
             k,
             {

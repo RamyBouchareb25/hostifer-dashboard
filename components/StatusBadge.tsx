@@ -46,7 +46,7 @@ export function StatusBadge({ status, showDot = true }: StatusBadgeProps) {
     >
       {showDot && (
         <span
-          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${config.dot} ${status === "building" ? "animate-pulse" : ""}`}
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot} ${status === "building" ? "animate-pulse" : ""}`}
           aria-hidden="true"
         />
       )}

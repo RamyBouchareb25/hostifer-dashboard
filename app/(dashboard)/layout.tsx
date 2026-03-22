@@ -42,7 +42,7 @@ export default function DashboardLayout({
         >
           {/* Top bar */}
           <header
-            className={`h-16 flex items-center gap-4 px-4 lg:px-6 border-b flex-shrink-0 sticky top-0 z-30
+            className={`h-16 flex items-center gap-4 px-4 lg:px-6 border-b shrink-0 sticky top-0 z-30
             ${darkMode ? "bg-[#111827] border-gray-800" : "bg-white border-gray-100 shadow-sm"}
           `}
           >
@@ -64,7 +64,7 @@ export default function DashboardLayout({
             }
           `}
             >
-              <Search size={16} className="flex-shrink-0" />
+              <Search size={16} className="shrink-0" />
               <input
                 type="text"
                 placeholder="Search projects, deployments..."
@@ -92,7 +92,7 @@ export default function DashboardLayout({
                   aria-label="New notifications"
                 />
               </button>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-linear-to-br from-[#0A4D9E] to-[#7C3AED] flex items-center justify-center cursor-pointer">
                 <span className="text-white text-xs font-semibold">JD</span>
               </div>
             </div>

@@ -49,7 +49,6 @@ const StepIcon = ({ status }: { status: StepState }) => {
 };
 
 export default function StepBuild({
-  repoUrl,
   serviceName,
   deploymentId,
   onComplete,

@@ -123,7 +123,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Tabs */}
-        <nav className="flex lg:flex-col gap-1 lg:w-48 flex-shrink-0">
+        <nav className="flex lg:flex-col gap-1 lg:w-48 shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -403,7 +403,7 @@ export default function SettingsPage() {
                       </div>
                       <button
                         onClick={() => handleDeleteKey(apiKey.id)}
-                        className="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex-shrink-0"
+                        className="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
                         aria-label="Revoke key"
                       >
                         <Trash2 size={15} />
@@ -466,7 +466,7 @@ export default function SettingsPage() {
                         {item.desc}
                       </p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-4">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
                       <input
                         type="checkbox"
                         defaultChecked={item.defaultOn}

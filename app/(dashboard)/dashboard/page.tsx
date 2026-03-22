@@ -154,7 +154,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                 style={{ backgroundColor: m.bg }}
               >
                 <m.icon size={20} style={{ color: m.color }} />
@@ -281,7 +281,7 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
                   <span className={`text-xs ${textSecondary}`}>
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                 className={`flex items-center gap-3 p-3 rounded-lg ${darkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"} transition-colors cursor-pointer`}
               >
                 <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}
                 >
                   <Rocket size={14} className={textSecondary} />
                 </div>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
                     {dep.commit} · {dep.commitMessage}
                   </p>
                 </div>
-                <div className="flex-shrink-0 text-right">
+                <div className="shrink-0 text-right">
                   <p className={`text-xs ${textSecondary}`}>{dep.createdAt}</p>
                   {dep.duration !== "—" && (
                     <p
@@ -431,7 +431,7 @@ export default function DashboardPage() {
             className={cardClass + " p-5 flex items-center gap-4"}
           >
             <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: item.color + "15" }}
             >
               <item.icon size={22} style={{ color: item.color }} />

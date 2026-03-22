@@ -97,7 +97,7 @@ export default function ActivityPage() {
               <div key={i} className="flex items-start gap-4 relative">
                 {/* Icon dot */}
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative z-10
+                  className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 relative z-10
                   ${darkMode ? "bg-gray-900 border border-gray-700" : "bg-white border border-gray-200 shadow-sm"}`}
                 >
                   {iconMap[item.type] || <CheckCircle2 size={16} />}
@@ -130,7 +130,7 @@ export default function ActivityPage() {
       <div className={cardClass + " p-6"}>
         <h2 className={`font-semibold mb-4 ${textPrimary}`}>All Deployments</h2>
         <div className="overflow-x-auto -mx-6 px-6">
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-150">
             <thead>
               <tr className={`text-xs font-medium ${textSecondary}`}>
                 <th className="text-left py-2 pr-4">Project</th>
@@ -165,7 +165,7 @@ export default function ActivityPage() {
                       </span>
                     </div>
                     <p
-                      className={`text-xs truncate max-w-[200px] ${textSecondary}`}
+                      className={`text-xs truncate max-w-50 ${textSecondary}`}
                     >
                       {dep.commitMessage}
                     </p>
