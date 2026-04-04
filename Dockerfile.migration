@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:25-alpine AS deps
+
+WORKDIR /app
+
+# Prisma engines on Alpine need the OpenSSL and libc compatibility packages.
+RUN apk add --no-cache libc6-compat openssl
+
+# Install only what Prisma migration startup needs.
+# prisma.config.ts imports dotenv/config, so dotenv must be present even though
+# the app's main package.json does not declare it.
+RUN cat > package.json <<'EOF'
+{
+	"name": "hostifer-prisma-migrations",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"dotenv": "17.3.1",
+		"prisma": "7.4.1"
+	}
+}
+EOF
+
+RUN npm install --omit=dev --no-audit --no-fund
+
+FROM node:25-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PRISMA_HIDE_UPDATE_MESSAGE=1
+ENV PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK=1
+
+RUN apk add --no-cache libc6-compat openssl && \
+    addgroup -S -g 1001 prisma && \
+    adduser -S -u 1001 -G prisma prisma
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+USER prisma
+
+# prisma migrate deploy is the only job of this image.
+ENTRYPOINT ["/app/node_modules/.bin/prisma"]
+CMD ["migrate", "deploy"]

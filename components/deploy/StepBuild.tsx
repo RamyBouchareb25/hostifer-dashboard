@@ -58,9 +58,11 @@ export default function StepBuild({
   const [steps, setSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
   const [overallStatus, setOverallStatus] = useState<string>("BUILDING");
   const [error, setError] = useState<string | null>(null);
+  const [streamConnected, setStreamConnected] = useState<boolean>(false);
   const logRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenLogIdsRef = useRef<Set<string>>(new Set());
 
   // auto-scroll to bottom on new log lines
   useEffect(() => {
@@ -71,8 +73,18 @@ export default function StepBuild({
 
   // SSE log streaming
   useEffect(() => {
+    seenLogIdsRef.current.clear();
+    queueMicrotask(() => {
+      setLogs([]);
+      setStreamConnected(false);
+    });
+
     const es = new EventSource(`/api/deployments/${deploymentId}/logs`);
     eventSourceRef.current = es;
+
+    es.onopen = () => {
+      setStreamConnected(true);
+    };
 
     es.onmessage = (e) => {
       try {
@@ -83,21 +95,22 @@ export default function StepBuild({
         }
         if (data.type === "error") {
           setError(data.message);
-          es.close();
           return;
         }
-        // deduplicate by timestamp+message to avoid showing the same line twice
-        // when the poller resets (e.g. on reconnect)
+
+        if (data.type === "pending" || data.type === "ready") {
+          return;
+        }
+
         setLogs((prev) => {
-          const last = prev[prev.length - 1];
-          if (
-            last &&
-            last.timestamp === data.timestamp &&
-            last.message === data.message
-          ) {
+          const log = data as LogLine;
+          const fallbackId = `${log.timestamp}:${log.stream}:${log.message}`;
+          const logId = log.id ?? fallbackId;
+          if (seenLogIdsRef.current.has(logId)) {
             return prev;
           }
-          return [...prev, data as LogLine];
+          seenLogIdsRef.current.add(logId);
+          return [...prev, { ...log, id: logId }];
         });
       } catch {
         // malformed event, skip
@@ -105,8 +118,7 @@ export default function StepBuild({
     };
 
     es.onerror = () => {
-      // EventSource auto-reconnects on error — don't close it here
-      // unless we're in a terminal state (handled by status polling below)
+      setStreamConnected(false);
     };
 
     return () => {
@@ -287,7 +299,9 @@ export default function StepBuild({
             </span>
           </div>
           {!isDone ? (
-            <span className="flex items-center gap-1.5 text-xs text-blue-400">
+            <span
+              className={`flex items-center gap-1.5 text-xs ${streamConnected ? "text-blue-400" : "text-yellow-400"}`}
+            >
               <Loader2 size={12} className="animate-spin" /> Live
             </span>
           ) : (
@@ -310,8 +324,8 @@ export default function StepBuild({
           {logs.length === 0 && (
             <div className="text-gray-600 text-xs">Waiting for logs...</div>
           )}
-          {logs.map((log, i) => (
-            <div key={i} className="flex items-start gap-3">
+          {logs.map((log) => (
+            <div key={log.id} className="flex items-start gap-3">
               <span className="text-gray-600 text-xs shrink-0 mt-px">
                 {new Date(log.timestamp).toISOString().slice(11, 19)}
               </span>

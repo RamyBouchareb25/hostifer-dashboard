@@ -1,0 +1,249 @@
+19:51:39
+build
+build started
+19:51:39
+git
+Cloning into '/tmp/build'...
+19:51:39
+build
+clone complete
+19:51:39
+railpack
+INFO No package manager inferred, using npm default
+19:51:39
+railpack
+patching railpack plan to run as uid 1000
+19:51:39
+railpack
+patched railpack plan
+19:51:39
+build
+framework detected
+19:51:39
+buildkit
+pushing image
+19:51:39
+buildkit
+resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.18.0
+19:51:39
+buildkit
+resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.18.0
+19:51:39
+build
+build started
+19:51:39
+git
+Cloning into '/tmp/build'...
+19:51:39
+build
+clone complete
+19:51:39
+railpack
+INFO No package manager inferred, using npm default
+19:51:39
+railpack
+patching railpack plan to run as uid 1000
+19:51:39
+railpack
+patched railpack plan
+19:51:39
+build
+framework detected
+19:51:39
+buildkit
+pushing image
+19:51:39
+buildkit
+resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.18.0
+19:51:39
+buildkit
+resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.18.0
+19:51:40
+buildkit
+load build definition from railpack-plan.json
+19:51:40
+buildkit
+install apt packages: libatomic1
+19:51:40
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.9
+19:51:40
+buildkit
+copy /app/node_modules
+19:51:40
+buildkit
+copy /root/.local/state/mise
+19:51:40
+buildkit
+copy /mise/shims
+19:51:40
+buildkit
+copy / /app
+19:51:40
+buildkit
+copy package.json
+19:51:40
+buildkit
+install mise packages: node
+19:51:40
+buildkit
+copy package-lock.json
+19:51:40
+buildkit
+mkdir /etc/mise
+19:51:40
+buildkit
+copy /app
+19:51:40
+buildkit
+copy /mise/installs
+19:51:40
+buildkit
+set ownership to uid 1000
+19:51:40
+buildkit
+copy src/prisma
+19:51:40
+buildkit
+npm run build
+19:51:40
+buildkit
+copy /etc/mise/config.toml
+19:51:40
+buildkit
+copy /usr/local/bin/mise
+19:51:40
+buildkit
+npm ci
+19:51:40
+buildkit
+create mise config
+19:51:40
+buildkit
+[railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+19:51:40
+buildkit
+copy /root/.cache
+19:51:40
+buildkit
+mkdir -p /app/node_modules/.cache
+19:51:40
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.9
+19:51:40
+buildkit
+loading .
+19:51:40
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.9
+19:51:40
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.9
+19:51:40
+buildkit
+loading .
+19:51:41
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.3.9
+19:51:41
+buildkit
+docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.3.9
+19:51:41
+buildkit
+loading .
+19:51:41
+buildkit
+loading .
+19:51:41
+buildkit
+mkdir /etc/mise
+19:51:41
+buildkit
+create mise config
+19:51:41
+buildkit
+install mise packages: node
+19:51:41
+buildkit
+mkdir -p /app/node_modules/.cache
+19:51:41
+buildkit
+copy package-lock.json
+19:51:41
+buildkit
+copy package.json
+19:51:41
+buildkit
+copy src/prisma
+19:51:41
+buildkit
+npm ci
+19:51:41
+buildkit
+copy / /app
+19:51:41
+buildkit
+copy / /app
+19:51:41
+buildkit
+npm run build
+19:51:41
+buildkit
+npm run build
+19:51:41
+buildkit
+set ownership to uid 1000
+19:51:41
+buildkit
+set ownership to uid 1000
+19:51:41
+buildkit
+copy /root/.cache
+19:51:41
+buildkit
+copy /app
+19:51:41
+buildkit
+install apt packages: libatomic1
+19:51:41
+buildkit
+copy /mise/shims
+19:51:41
+buildkit
+copy /mise/installs
+19:51:41
+buildkit
+copy /usr/local/bin/mise
+19:51:41
+buildkit
+copy /etc/mise/config.toml
+19:51:41
+buildkit
+copy /root/.local/state/mise
+19:51:41
+buildkit
+copy /app/node_modules
+19:51:41
+buildkit
+copy /app
+19:51:41
+buildkit
+[railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+19:51:41
+buildkit
+[railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+19:51:41
+buildkit
+exporting to image
+19:51:41
+buildkit
+exporting to image
+19:51:41
+buildkit
+exporting to image
+19:51:41
+buildkit
+exporting to image
+19:51:41
+build
+build complete
