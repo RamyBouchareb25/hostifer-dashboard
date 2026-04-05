@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireProjectAccess } from "@/lib/auth-helpers";
 import { encrypt } from "@/lib/crypto";
+import { argoClient } from "@/lib/argo-client";
+import { getLatestCommit } from "@/lib/github";
 
 export async function createProject(data: {
   name: string;
@@ -32,9 +34,10 @@ export async function createProject(data: {
     });
   }
 
-  const slug = data.name.toLowerCase().replace(/[^a-z0-9]/g, "-") +
-        "-" +
-        Math.random().toString(36).substring(2, 7);
+  const slug =
+    data.name.toLowerCase().replace(/[^a-z0-9]/g, "-") +
+    "-" +
+    Math.random().toString(36).substring(2, 7);
   const project = await prisma.project.create({
     data: {
       name: data.name,
@@ -129,4 +132,63 @@ export async function getProject(projectId: string) {
       envVars: true,
     },
   });
+}
+
+function getTagFromImageName(
+  imageName: string | null | undefined,
+): string | null {
+  if (!imageName) return null;
+  const parts = imageName.split(":");
+  if (parts.length < 2) return null;
+  return parts[parts.length - 1] || null;
+}
+
+export async function deleteProject(
+  projectId: string,
+): Promise<{ workflowName: string }> {
+  await requireProjectAccess(projectId);
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      slug: true,
+      subdomain: true,
+      repoUrl: true,
+      deployments: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          commitSha: true,
+          imageName: true,
+        },
+      },
+    },
+  });
+
+  if (!project) throw new Error("Project not found");
+
+  const releaseName = project.slug;
+  const subdomain = project.subdomain ?? project.slug;
+  const latestDeployment = project.deployments[0];
+
+  let commitSha =
+    latestDeployment?.commitSha ??
+    getTagFromImageName(latestDeployment?.imageName);
+  if (!commitSha) {
+    const latestCommit = await getLatestCommit(project.repoUrl);
+    commitSha = latestCommit.sha;
+  }
+
+  const imageName = `${project.slug}:${commitSha}`;
+
+  const { workflowName } = await argoClient.submitDeleteWorkflow({
+    releaseName,
+    subdomain,
+    imageName,
+  });
+
+  await prisma.project.delete({ where: { id: project.id } });
+
+  return { workflowName };
 }

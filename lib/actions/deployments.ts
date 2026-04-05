@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireProjectAccess } from "@/lib/auth-helpers";
-import { generateTenantId, generateImageName } from "@/lib/uid";
+import { generateImageName } from "@/lib/uid";
 import { argoClient } from "@/lib/argo-client";
 import {
   DeploymentStatus,
@@ -23,11 +23,14 @@ export async function triggerDeployment(projectId: string): Promise<{
       envVars: true,
     },
   });
+  
 
   if (!project) throw new Error("Project not found");
 
-  const tenantId = generateTenantId(project.slug);
-  const imageName = generateImageName(tenantId);
+  const tenantId = project.slug;
+        const commit = await getLatestCommit(project.repoUrl);
+
+  const imageName = generateImageName(tenantId, commit.sha);
   const subdomain = project.slug;
 
   let deployment;

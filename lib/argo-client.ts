@@ -112,4 +112,52 @@ export const argoClient = {
       ),
     };
   },
+
+  async submitDeleteWorkflow(params: {
+    releaseName: string;
+    subdomain: string;
+    imageName: string;
+  }): Promise<{ workflowName: string }> {
+    const url = `${process.env.ARGO_SERVER_URL}/api/v1/workflows/${process.env.ARGO_WORKFLOW_NAMESPACE}`;
+    const body = {
+      workflow: {
+        metadata: {
+          generateName: "hostifer-delete-",
+          namespace: process.env.ARGO_WORKFLOW_NAMESPACE,
+        },
+        spec: {
+          workflowTemplateRef: {
+            name: "hostifer-delete",
+          },
+          arguments: {
+            parameters: [
+              { name: "release_name", value: params.releaseName },
+              { name: "subdomain", value: params.subdomain },
+              { name: "image_name", value: params.imageName },
+            ],
+          },
+        },
+      },
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.ARGO_SERVER_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new ArgoError(
+        res.status,
+        errorData.message || "Failed to submit delete workflow",
+      );
+    }
+
+    const data = await res.json();
+    return { workflowName: data.metadata.name };
+  },
 };

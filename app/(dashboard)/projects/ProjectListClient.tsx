@@ -47,6 +47,8 @@ export function ProjectCard({
   darkMode: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
 
   const textPrimary = darkMode ? "text-white" : "text-gray-900";
   const textSecondary = darkMode ? "text-gray-400" : "text-gray-500";
@@ -58,8 +60,36 @@ export function ProjectCard({
     toast.success(`Redeploying ${project.name}...`);
   };
 
-  const handleDelete = () => {
-    toast.error(`Delete ${project.name}? This action cannot be undone.`);
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      `Delete ${project.name}? This action cannot be undone.`,
+    );
+
+    if (!confirmed || isDeleting) {
+      setMenuOpen(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "DELETE",
+      });
+
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(body.error ?? "Failed to delete project");
+        return;
+      }
+
+      toast.success(`Deleted ${project.name}`);
+      router.refresh();
+    } catch {
+      toast.error("Failed to delete project");
+    } finally {
+      setIsDeleting(false);
+    }
+
     setMenuOpen(false);
   };
 
@@ -145,10 +175,11 @@ export function ProjectCard({
                 />
                 <button
                   onClick={handleDelete}
+                  disabled={isDeleting}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 ${darkMode ? "hover:bg-gray-800" : "hover:bg-red-50"}`}
                 >
                   <Trash2 size={14} />
-                  Delete
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </>
