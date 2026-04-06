@@ -145,16 +145,18 @@ function getTagFromImageName(
 
 export async function deleteProject(
   projectId: string,
-): Promise<{ workflowName: string }> {
+): Promise<{ workflowName: string; status: "DELETING" }> {
   await requireProjectAccess(projectId);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: {
       id: true,
+      status: true,
       slug: true,
       subdomain: true,
       repoUrl: true,
+      deleteWorkflowName: true,
       deployments: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -167,6 +169,19 @@ export async function deleteProject(
   });
 
   if (!project) throw new Error("Project not found");
+
+  const projectStatus = String(project.status);
+
+  if (projectStatus === "DELETING") {
+    if (!project.deleteWorkflowName) {
+      throw new Error("Project deletion is already in progress");
+    }
+
+    return {
+      workflowName: project.deleteWorkflowName,
+      status: "DELETING",
+    };
+  }
 
   const releaseName = project.slug;
   const subdomain = project.subdomain ?? project.slug;
@@ -188,7 +203,61 @@ export async function deleteProject(
     imageName,
   });
 
-  await prisma.project.delete({ where: { id: project.id } });
+  await prisma.project.update({
+    where: { id: project.id },
+    data: {
+      status: "DELETING" as never,
+      deleteWorkflowName: workflowName,
+    },
+  });
 
-  return { workflowName };
+  return { workflowName, status: "DELETING" };
+}
+
+export async function syncProjectDeletionStatus(projectId: string): Promise<{
+  status: "DELETING" | "DELETED";
+  errorMessage?: string;
+}> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      status: true,
+      deleteWorkflowName: true,
+    },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  await requireProjectAccess(project.id);
+
+  const projectStatus = String(project.status);
+
+  if (projectStatus !== "DELETING" || !project.deleteWorkflowName) {
+    return { status: "DELETING" };
+  }
+
+  try {
+    const workflow = await argoClient.getWorkflowStatus(
+      project.deleteWorkflowName,
+    );
+
+    if (workflow.phase === "Succeeded") {
+      await prisma.project.delete({ where: { id: projectId } });
+      return { status: "DELETED" };
+    }
+
+    if (workflow.phase === "Failed" || workflow.phase === "Error") {
+      return {
+        status: "DELETING",
+        errorMessage: "Delete workflow failed and needs manual intervention.",
+      };
+    }
+
+    return { status: "DELETING" };
+  } catch {
+    return { status: "DELETING" };
+  }
 }

@@ -43,6 +43,8 @@ export default async function ProjectsPage({
   const filteredProjects = projects.filter((p) => {
     if (statusFilter === "all") return true;
 
+    if (String(p.status) === "DELETING") return false;
+
     const latestDeploy = p.deployments?.[0];
     const derivedStatus =
       latestDeploy?.status === "LIVE"

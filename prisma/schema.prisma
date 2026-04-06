@@ -10,15 +10,16 @@ datasource db {
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum UserRole {
-  OWNER   // platform owner, full access
-  ADMIN   // can manage users and projects but not billing/platform settings
-  MEMBER  // regular user
+  OWNER // platform owner, full access
+  ADMIN // can manage users and projects but not billing/platform settings
+  MEMBER // regular user
 }
 
 enum ProjectStatus {
   ACTIVE
-  SUSPENDED   // manually suspended by admin
-  DELETED     // soft deleted
+  SUSPENDED // manually suspended by admin
+  DELETED // soft deleted
+  DELETING // delete workflow in progress
 }
 
 enum DeploymentStatus {
@@ -79,52 +80,52 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String?   // hashed, for credentials sign-in
+  password      String? // hashed, for credentials sign-in
 
-  role          UserRole  @default(MEMBER)
+  role UserRole @default(MEMBER)
 
   // profile
-  username      String?   @unique
-  bio           String?
-  company       String?
-  location      String?
-  website       String?
+  username       String? @unique
+  bio            String?
+  company        String?
+  location       String?
+  website        String?
   githubUsername String?
 
   // preferences
-  preferences   UserPreferences?
+  preferences UserPreferences?
 
   // platform relations
-  ownedProjects     Project[]       @relation("ProjectOwner")
-  projectMembers    ProjectMember[]
-  activityLogs      ActivityLog[]
-  notifications     Notification[]
-  invitationsSent   Invitation[]    @relation("InvitationSender")
+  ownedProjects   Project[]       @relation("ProjectOwner")
+  projectMembers  ProjectMember[]
+  activityLogs    ActivityLog[]
+  notifications   Notification[]
+  invitationsSent Invitation[]    @relation("InvitationSender")
 
   // nextauth relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   deployments Deployment[]
 }
 
 model UserPreferences {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // ui preferences
-  theme                 String   @default("dark")   // dark | light | system
-  defaultRegion         String   @default("local")
-  emailNotifications    Boolean  @default(true)
-  deploymentAlerts      Boolean  @default(true)
-  marketingEmails       Boolean  @default(false)
+  theme              String  @default("dark") // dark | light | system
+  defaultRegion      String  @default("local")
+  emailNotifications Boolean @default(true)
+  deploymentAlerts   Boolean @default(true)
+  marketingEmails    Boolean @default(false)
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Account {
@@ -166,107 +167,111 @@ model VerificationToken {
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
 model Plan {
-  id          String    @id @default(cuid())
-  name        String    @unique  // "Free", "Starter", "Pro", "Enterprise"
-  tier        PlanTier  @unique
+  id   String   @id @default(cuid())
+  name String   @unique // "Free", "Starter", "Pro", "Enterprise"
+  tier PlanTier @unique
 
   // resource limits stored as raw values
-  maxProjects       Int       // max projects per user
-  maxDeployments    Int       // max deployments per project
-  maxMemoryMi       Int       // memory limit in Mi
-  maxCpuM           Int       // cpu limit in millicores
-  maxStorageGi      Int       // storage in Gi
-  maxBandwidthGb    Int       // monthly bandwidth in GB
-  buildTimeoutMins  Int       // max build duration in minutes
+  maxProjects      Int // max projects per user
+  maxDeployments   Int // max deployments per project
+  maxMemoryMi      Int // memory limit in Mi
+  maxCpuM          Int // cpu limit in millicores
+  maxStorageGi     Int // storage in Gi
+  maxBandwidthGb   Int // monthly bandwidth in GB
+  buildTimeoutMins Int // max build duration in minutes
 
   // features
-  customDomains     Boolean   @default(false)
-  teamMembers       Boolean   @default(false)
-  priorityBuilds    Boolean   @default(false)
+  customDomains  Boolean @default(false)
+  teamMembers    Boolean @default(false)
+  priorityBuilds Boolean @default(false)
 
-  projects          Project[]
+  projects Project[]
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 // A project = one deployed application. Maps to one k8s namespace.
 
 model Project {
-  id            String        @id @default(cuid())
+  id String @id @default(cuid())
 
   // identity
-  name          String        // display name, user defined
-  slug          String        @unique  // e.g. "myapp-4u1sl1f" — used as k8s namespace and subdomain
-  description   String?
+  name        String // display name, user defined
+  slug        String  @unique // e.g. "myapp-4u1sl1f" — used as k8s namespace and subdomain
+  description String?
 
   // ownership
-  ownerId       String
-  owner         User          @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members       ProjectMember[]
+  ownerId String
+  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members ProjectMember[]
 
   // plan
-  planId        String
-  plan          Plan          @relation(fields: [planId], references: [id])
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
 
   // source
-  repoUrl       String        // github public url
-  framework     String?       // detected framework e.g. "nextjs", "express"
-  branch        String        @default("main")
-  port          Int           @default(3000)
+  repoUrl   String // github public url
+  framework String? // detected framework e.g. "nextjs", "express"
+  branch    String  @default("main")
+  port      Int     @default(3000)
 
   // infrastructure
-  region        String        @default("local")
-  namespace     String?       // k8s namespace, set after first provisioning
-  subdomain     String?       // subdomain on hostifer.me
-  customDomain  String?       // optional custom domain
+  region       String  @default("local")
+  namespace    String? // k8s namespace, set after first provisioning
+  subdomain    String? // subdomain on hostifer.me
+  customDomain String? // optional custom domain
+
+  // deletion workflow tracking
+  deleteWorkflowName String?
 
   // state
-  status        ProjectStatus @default(ACTIVE)
+  status ProjectStatus @default(ACTIVE)
 
   // relations
-  deployments   Deployment[]
-  envVars       EnvVar[]
-  domains       Domain[]
-  activityLogs  ActivityLog[]
-  invitations   Invitation[]
+  deployments  Deployment[]
+  envVars      EnvVar[]
+  domains      Domain[]
+  activityLogs ActivityLog[]
+  invitations  Invitation[]
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ownerId])
   @@index([slug])
+  @@index([deleteWorkflowName])
 }
 
 model ProjectMember {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   projectId String
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      UserRole  @default(MEMBER)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole @default(MEMBER)
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, userId])
 }
 
 model Invitation {
-  id          String    @id @default(cuid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  senderId    String
-  sender      User      @relation("InvitationSender", fields: [senderId], references: [id])
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User    @relation("InvitationSender", fields: [senderId], references: [id])
 
-  email       String
-  role        UserRole  @default(MEMBER)
-  token       String    @unique @default(cuid())
-  expiresAt   DateTime
-  acceptedAt  DateTime?
+  email      String
+  role       UserRole  @default(MEMBER)
+  token      String    @unique @default(cuid())
+  expiresAt  DateTime
+  acceptedAt DateTime?
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([token])
   @@index([email])
@@ -275,35 +280,35 @@ model Invitation {
 // ─── Deployments ─────────────────────────────────────────────────────────────
 
 model Deployment {
-  id            String            @id @default(cuid())
+  id String @id @default(cuid())
 
-  projectId     String
-  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // argo workflow reference
-  workflowName  String?           // argo workflow name e.g. "hostifer-deploy-zkdmt"
-  workflowNamespace String        @default("hostifer-system")
+  workflowName      String? // argo workflow name e.g. "hostifer-deploy-zkdmt"
+  workflowNamespace String  @default("hostifer-system")
 
   // build info
-  imageName     String?           // full image ref pushed to registry
-  commitSha     String?           // git commit sha if available
+  imageName     String? // full image ref pushed to registry
+  commitSha     String? // git commit sha if available
   commitMessage String?
-  triggeredBy   String           // userId who triggered
-  triggerer     User           @relation(fields: [triggeredBy], references: [id], onDelete: Cascade)
+  triggeredBy   String // userId who triggered
+  triggerer     User             @relation(fields: [triggeredBy], references: [id], onDelete: Cascade)
   // status
-  status        DeploymentStatus  @default(QUEUED)
+  status        DeploymentStatus @default(QUEUED)
   steps         DeploymentStep[]
 
   // timing
   startedAt     DateTime?
   completedAt   DateTime?
-  buildDuration Int?              // seconds
+  buildDuration Int? // seconds
 
   // error
-  errorMessage  String?           @db.Text
+  errorMessage String? @db.Text
 
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
   @@index([workflowName])
@@ -311,19 +316,19 @@ model Deployment {
 }
 
 model DeploymentStep {
-  id            String               @id @default(cuid())
-  deploymentId  String
-  deployment    Deployment           @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  deploymentId String
+  deployment   Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
 
-  name          DeploymentStepName
-  status        DeploymentStepStatus @default(PENDING)
+  name   DeploymentStepName
+  status DeploymentStepStatus @default(PENDING)
 
-  startedAt     DateTime?
-  completedAt   DateTime?
-  errorMessage  String?              @db.Text
+  startedAt    DateTime?
+  completedAt  DateTime?
+  errorMessage String?   @db.Text
 
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([deploymentId, name])
   @@index([deploymentId])
@@ -332,16 +337,16 @@ model DeploymentStep {
 // ─── Environment Variables ────────────────────────────────────────────────────
 
 model EnvVar {
-  id          String    @id @default(cuid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  key         String
-  value       String    @db.Text  // encrypted at application layer before storing
-  isSecret    Boolean   @default(true)
+  key      String
+  value    String  @db.Text // encrypted at application layer before storing
+  isSecret Boolean @default(true)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, key])
   @@index([projectId])
@@ -350,17 +355,17 @@ model EnvVar {
 // ─── Custom Domains ───────────────────────────────────────────────────────────
 
 model Domain {
-  id          String    @id @default(cuid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  domain      String    @unique
-  verified    Boolean   @default(false)
-  verifiedAt  DateTime?
-  sslEnabled  Boolean   @default(false)
+  domain     String    @unique
+  verified   Boolean   @default(false)
+  verifiedAt DateTime?
+  sslEnabled Boolean   @default(false)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
 }
@@ -369,18 +374,18 @@ model Domain {
 // Append-only audit trail. Never update or delete rows.
 
 model ActivityLog {
-  id          String          @id @default(cuid())
-  projectId   String?
-  project     Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  userId      String?
-  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  action      ActivityAction
-  metadata    Json?           // arbitrary context e.g. { deploymentId, oldValue, newValue }
-  ipAddress   String?
-  userAgent   String?
+  action    ActivityAction
+  metadata  Json? // arbitrary context e.g. { deploymentId, oldValue, newValue }
+  ipAddress String?
+  userAgent String?
 
-  createdAt   DateTime        @default(now())
+  createdAt DateTime @default(now())
 
   @@index([projectId])
   @@index([userId])
@@ -390,17 +395,17 @@ model ActivityLog {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 model Notification {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title       String
-  message     String
-  read        Boolean   @default(false)
-  readAt      DateTime?
-  link        String?   // optional deep link e.g. /projects/xyz/deployments/abc
+  title   String
+  message String
+  read    Boolean   @default(false)
+  readAt  DateTime?
+  link    String? // optional deep link e.g. /projects/xyz/deployments/abc
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([read])

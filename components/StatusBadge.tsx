@@ -1,6 +1,5 @@
 "use client";
-import { DeployStatus } from '../data/mockData';
-
+import { DeployStatus } from "../data/mockData";
 
 interface StatusBadgeProps {
   status: DeployStatus;
@@ -35,6 +34,12 @@ const statusConfig: Record<
     text: "text-gray-600 dark:text-gray-400",
     dot: "bg-gray-400",
   },
+  deleting: {
+    label: "Deleting",
+    bg: "bg-red-100 dark:bg-red-900/30",
+    text: "text-red-700 dark:text-red-400",
+    dot: "bg-red-500",
+  },
 };
 
 export function StatusBadge({ status, showDot = true }: StatusBadgeProps) {
@@ -46,7 +51,7 @@ export function StatusBadge({ status, showDot = true }: StatusBadgeProps) {
     >
       {showDot && (
         <span
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot} ${status === "building" ? "animate-pulse" : ""}`}
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot} ${status === "building" || status === "deleting" ? "animate-pulse" : ""}`}
           aria-hidden="true"
         />
       )}

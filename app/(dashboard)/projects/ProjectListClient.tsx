@@ -17,8 +17,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useTheme } from "@/context/ThemeContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { syncProjectDeletionStatus } from "@/lib/actions/projects";
 import type { Project, Deployment } from "@/lib/generated/prisma/client";
 import { type DeployStatus } from "@/data/mockData";
 
@@ -28,6 +39,7 @@ export type ProjectWithRelations = Project & {
   _count?: {
     deployments: number;
   };
+  deleteWorkflowName?: string | null;
 };
 
 const frameworkColors: Record<string, string> = {
@@ -39,6 +51,83 @@ const frameworkColors: Record<string, string> = {
   PostgreSQL: "#0A4D9E",
 };
 
+function DeleteProjectDialog({
+  open,
+  projectName,
+  isSubmitting,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  projectName: string;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+
+  const canConfirm =
+    confirmation.trim() === projectName && !isSubmitting && open;
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setConfirmation("");
+    }
+
+    if (isSubmitting && !nextOpen) return;
+    onOpenChange(nextOpen);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-115">
+        <DialogHeader>
+          <DialogTitle>Delete {projectName}?</DialogTitle>
+          <DialogDescription>
+            This will stop the Argo workflow, remove the project namespace, and
+            permanently delete the project record after cleanup finishes.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Type{" "}
+            <span className="font-semibold text-foreground">{projectName}</span>{" "}
+            to confirm.
+          </p>
+          <Input
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            placeholder={projectName}
+            autoComplete="off"
+            spellCheck={false}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={!canConfirm}
+          >
+            {isSubmitting ? "Deleting..." : "Delete project"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function ProjectCard({
   project,
   darkMode,
@@ -48,6 +137,7 @@ export function ProjectCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const router = useRouter();
 
   const textPrimary = darkMode ? "text-white" : "text-gray-900";
@@ -55,21 +145,21 @@ export function ProjectCard({
   const cardClass = darkMode
     ? "bg-[#111827] border border-gray-800 hover:border-gray-700"
     : "bg-white border border-gray-100 hover:border-gray-200 shadow-sm";
+  const projectStatus = String(project.status);
+  const isProjectDeleting = projectStatus === "DELETING" || isDeleting;
 
   const handleDeploy = () => {
+    if (isProjectDeleting) return;
     toast.success(`Redeploying ${project.name}...`);
   };
 
-  const handleDelete = async () => {
-    const confirmed = window.confirm(
-      `Delete ${project.name}? This action cannot be undone.`,
-    );
+  const handleDelete = () => {
+    if (isProjectDeleting) return;
+    setMenuOpen(false);
+    setDeleteModalOpen(true);
+  };
 
-    if (!confirmed || isDeleting) {
-      setMenuOpen(false);
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/projects/${project.id}`, {
@@ -82,16 +172,57 @@ export function ProjectCard({
         return;
       }
 
-      toast.success(`Deleted ${project.name}`);
+      toast.success(`Deleting ${project.name}...`);
+      setDeleteModalOpen(false);
       router.refresh();
     } catch {
       toast.error("Failed to delete project");
     } finally {
       setIsDeleting(false);
     }
-
-    setMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (projectStatus !== "DELETING" || !project.deleteWorkflowName) return;
+
+    let active = true;
+
+    const pollDeletion = async () => {
+      try {
+        const result = await syncProjectDeletionStatus(project.id);
+
+        if (!active) return;
+
+        if (result.status === "DELETED") {
+          active = false;
+          router.refresh();
+          return;
+        }
+
+        if (result.errorMessage) {
+          active = false;
+          toast.error(result.errorMessage);
+        }
+      } catch (error) {
+        if (!active) return;
+
+        if (error instanceof Error && error.message === "Project not found") {
+          active = false;
+          router.refresh();
+        }
+      }
+    };
+
+    void pollDeletion();
+    const interval = setInterval(() => {
+      void pollDeletion();
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [project.deleteWorkflowName, project.id, projectStatus, router]);
 
   const latestDeploy = project.deployments?.[0];
   const uiStatus =
@@ -110,10 +241,11 @@ export function ProjectCard({
   const projectUrl =
     project.customDomain ||
     (project.subdomain ? `${project.subdomain}.hostifer.me` : "");
+  const badgeStatus = projectStatus === "DELETING" ? "deleting" : uiStatus;
 
   return (
     <div
-      className={`rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${cardClass}`}
+      className={`rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${cardClass} ${isProjectDeleting ? "opacity-80" : ""}`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -139,13 +271,14 @@ export function ProjectCard({
         <div className="relative shrink-0 ml-2">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`p-1.5 rounded-lg transition-colors ${darkMode ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
+            disabled={isProjectDeleting}
+            className={`p-1.5 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${darkMode ? "hover:bg-gray-800 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
             aria-label="Project options"
           >
             <MoreHorizontal size={16} />
           </button>
 
-          {menuOpen && (
+          {menuOpen && !isProjectDeleting && (
             <>
               <div
                 className="fixed inset-0 z-10"
@@ -157,6 +290,7 @@ export function ProjectCard({
               >
                 <button
                   onClick={handleDeploy}
+                  disabled={isProjectDeleting}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${darkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-50"}`}
                 >
                   <RefreshCw size={14} />
@@ -175,8 +309,8 @@ export function ProjectCard({
                 />
                 <button
                   onClick={handleDelete}
-                  disabled={isDeleting}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 ${darkMode ? "hover:bg-gray-800" : "hover:bg-red-50"}`}
+                  disabled={isProjectDeleting}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 disabled:cursor-not-allowed disabled:opacity-50 ${darkMode ? "hover:bg-gray-800" : "hover:bg-red-50"}`}
                 >
                   <Trash2 size={14} />
                   {isDeleting ? "Deleting..." : "Delete"}
@@ -208,7 +342,7 @@ export function ProjectCard({
         className={`flex items-center justify-between pt-3 border-t ${darkMode ? "border-gray-800" : "border-gray-100"}`}
       >
         <div className="flex items-center gap-3">
-          <StatusBadge status={uiStatus as DeployStatus} />
+          <StatusBadge status={badgeStatus as DeployStatus} />
           <span className={`text-xs ${textSecondary}`}>{lastDeployText}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -228,13 +362,24 @@ export function ProjectCard({
           )}
           <button
             onClick={handleDeploy}
-            className="flex items-center gap-1.5 text-xs bg-[#0A4D9E] hover:bg-[#0a3d7e] text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+            disabled={isProjectDeleting}
+            className="flex items-center gap-1.5 text-xs bg-[#0A4D9E] hover:bg-[#0a3d7e] disabled:bg-[#0A4D9E]/60 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
           >
             <Rocket size={12} />
             Deploy
           </button>
         </div>
       </div>
+
+      <DeleteProjectDialog
+        open={deleteModalOpen}
+        projectName={project.name}
+        isSubmitting={isDeleting}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={() => {
+          void handleConfirmDelete();
+        }}
+      />
     </div>
   );
 }
